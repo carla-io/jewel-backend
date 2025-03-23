@@ -87,7 +87,7 @@ exports.updateOrderStatus = async (req, res) => {
     const { orderId } = req.params;
     const { status, expoPushToken } = req.body; // Receive the push token
 
-    if (!['Processing', 'Approved', 'Canceled'].includes(status)) {
+    if (!['Processing', 'Delivered', 'Cancelled'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status value.' });
     }
 

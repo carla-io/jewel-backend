@@ -96,6 +96,9 @@ exports.getProducts = async (req, res) => {
 
 exports.getSingleProduct = async (req, res, next) => {
     try {
+        console.log("Request params:", req.params);
+        console.log("Product ID:", req.params.id);
+        
         // Find the product by ID from the request parameters
         const product = await Product.findById(req.params.id);
 
@@ -113,13 +116,13 @@ exports.getSingleProduct = async (req, res, next) => {
             product,
         });
     } catch (error) {
+        console.error("Error fetching product:", error);
         return res.status(500).json({
             success: false,
             message: error.message,
         });
     }
 };
-
 
 
 exports.updateProduct = async (req, res, next) => {
