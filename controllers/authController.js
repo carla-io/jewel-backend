@@ -10,82 +10,120 @@ const passport = require("passport");
 
 
 
+
 const register = async (req, res) => {
-    const { username, email, password } = req.body;
-
     try {
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).json({ message: 'User already exists' });
+        console.log("Received file:", req.file); // Debugging
+        console.log("Received body:", req.body); // Debugging
 
-        // Hash the password
+        const { username, email, password } = req.body;
+
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: "All fields are required" });
+        }
+
+        const lowerEmail = email.toLowerCase(); // Ensure email consistency
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ email: lowerEmail });
+        if (existingUser) {
+            return res.status(400).json({ message: "User already exists" });
+        }
+
+        // Check if file exists before uploading
+        let profilePicture = { public_id: "", url: "" }; // Default if no image
+        if (req.file) {
+            const uploadResult = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder: "profile", resource_type: "auto" },
+                    (error, result) => {
+                        if (error) {
+                            console.error("Cloudinary Upload Error:", error);
+                            reject(new Error("Image upload failed"));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                );
+                stream.end(req.file.buffer);
+            });
+
+            profilePicture = {
+                public_id: uploadResult.public_id,
+                url: uploadResult.secure_url,
+            };
+        }
+
+        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Upload profile picture to Cloudinary
-        const result = await cloudinary.uploader.upload(req.file.path, {
-            folder: 'profile',
-            width: 150,
-            crop: 'scale',
-        });
-
-        // Create new user with profile picture
-        const user = await User.create({
+        // Create new user
+        const user = new User({
             username,
-            email,
+            email: lowerEmail,
             password: hashedPassword,
-            profilePicture: {
-                public_id: result.public_id,
-                url: result.secure_url,
-            },
+            profilePicture,
+            role: "user", // Default role if missing in schema
         });
 
-        // Generate JWT token (30-day expiration)
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        await user.save();
 
-        // Respond with user info and token
+        // Generate JWT
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+
         res.status(201).json({
             user: {
                 id: user._id,
                 username: user.username,
                 email: user.email,
                 profilePicture: user.profilePicture,
+                role: user.role,
             },
             token,
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Error in register:", error);
+        res.status(500).json({ message: "Server error" });
     }
 };
 
-// Login Controller
 const login = async (req, res) => {
-    const { email, password } = req.body;
-
     try {
-        // Check if user exists
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).json({ message: 'User not found' });
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: "All fields are required" });
+        }
+
+        const lowerEmail = email.toLowerCase(); // Ensure email consistency
+        const user = await User.findOne({ email: lowerEmail });
+
+        if (!user) {
+            return res.status(400).json({ message: "User not found" });
+        }
 
         // Validate password
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) return res.status(400).json({ message: 'Invalid credentials' });
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: "Invalid credentials" });
+        }
 
-        // Generate JWT token (30-day expiration)
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        // Generate JWT token
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
-        // Respond with user info and token
         res.status(200).json({
             user: {
                 id: user._id,
                 username: user.username,
                 email: user.email,
-                role: user.role,  // Ensure 'role' exists in your model
+                role: user.role,
                 profilePicture: user.profilePicture,
             },
             token,
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Login Error:", error);
+        res.status(500).json({ message: "Server error" });
     }
 };
 
