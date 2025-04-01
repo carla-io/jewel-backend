@@ -26,7 +26,8 @@ const Product = mongoose.models.Product || mongoose.model('Product', new mongoos
             values: [
                 'Necklaces',
                 'Earrings',
-                'Bracelets'
+                'Bracelets',
+                'Rings'
             ],
             message: 'Please select correct category for product'
         }

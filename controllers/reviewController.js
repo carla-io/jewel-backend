@@ -69,32 +69,29 @@ exports.addReview = async (req, res) => {
 
 exports.getAllReviews = async (req, res) => {
     try {
-        // Fetch reviews and populate product details
-        const reviews = await Review.find()
-            .populate('productId', 'name')  // Populate only the name field of the associated product
-            .exec();
-
-        // Check if reviews exist
-        if (reviews.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'No reviews found.',
-            });
-        }
-
-        // Send back reviews along with product name
-        return res.status(200).json({
-            success: true,
-            reviews,
-        });
+      const { productId } = req.query;
+      
+      let query = {};
+      if (productId) {
+        query.productId = productId;
+      }
+      
+      const reviews = await Review.find(query)
+        .populate('userId', 'name image')
+        .sort({ createdAt: -1 });
+        
+      return res.status(200).json({
+        success: true,
+        reviews
+      });
     } catch (error) {
-        console.error('Error fetching reviews:', error.message);
-        return res.status(500).json({
-            success: false,
-            message: 'Server error, could not fetch reviews.',
-        });
+      console.error('Error fetching reviews:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Server error, could not fetch reviews.'
+      });
     }
-};
+  };
 
 exports.deleteReview = async (req, res) => {
     try {
@@ -234,4 +231,30 @@ exports.updateReview = async (req, res) => {
     }
 };
 
-
+exports.getReviewsByProductId = async (req, res) => {
+    try {
+      const { productId } = req.params;
+      
+      if (!productId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product ID is required.'
+        });
+      }
+      
+      const reviews = await Review.find({ productId })
+        .populate('userId', 'name image') // Assuming you want user details
+        .sort({ createdAt: -1 }); // Most recent first
+        
+      return res.status(200).json({
+        success: true,
+        reviews
+      });
+    } catch (error) {
+      console.error('Error fetching reviews by product:', error.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Server error, could not fetch reviews.'
+      });
+    }
+  };

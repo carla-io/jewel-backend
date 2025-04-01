@@ -3,10 +3,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cloudinary = require('../config/cloudinary');
 // const admin = require('firebase-admin');
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
-const FacebookStrategy = require("passport-facebook").Strategy;
-const admin = require("../config/firebase");
-const passport = require("passport");
+// const GoogleStrategy = require("passport-google-oauth20").Strategy;
+// const FacebookStrategy = require("passport-facebook").Strategy;
+// const admin = require("../config/firebase");
+// const passport = require("passport");
 
 
 
