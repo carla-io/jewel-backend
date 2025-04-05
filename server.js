@@ -25,4 +25,5 @@ app.use('/api/auth', user);
 app.use('/api/order', order);
 app.use('/api/reviews', review);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/promotions', require('./routes/promotionRoutes'));
 
