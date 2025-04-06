@@ -7,57 +7,32 @@ const expo = new Expo();
 
 exports.registerToken = async (req, res) => {
     try {
-        const { expoPushToken, deviceInfo, userId } = req.body;
-        
-        // Validate the push token format
-        if (!Expo.isExpoPushToken(expoPushToken)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid Expo push token format'
-            });
-        }
-        
-        // Create update data with only available fields
-        const updateData = { 
+        const { expoPushToken, userId, deviceInfo } = req.body;
+        const lastUsed = new Date();
+    
+        console.log('Registering token with data:', { expoPushToken, userId, deviceInfo, lastUsed });
+    
+        let existingToken = await NotificationToken.findOne({ expoPushToken });
+    
+        if (existingToken) {
+          existingToken.userId = userId || existingToken.userId;
+          existingToken.deviceInfo = deviceInfo;
+          existingToken.lastUsed = lastUsed;
+          await existingToken.save();
+        } else {
+          await NotificationToken.create({
             expoPushToken,
+            userId,
             deviceInfo,
-            lastUsed: new Date()
-        };
-        
-        // Only add userId if it exists
-        if (userId) {
-            // Check if userId is a valid ObjectId
-            if (mongoose.Types.ObjectId.isValid(userId)) {
-                updateData.userId = new mongoose.Types.ObjectId(userId);
-            } else {
-                console.warn(`Invalid ObjectId format for userId: ${userId}`);
-                // Store as string if not valid ObjectId (not ideal but prevents failures)
-                updateData.userId = userId;
-            }
+            lastUsed
+          });
         }
-        
-        console.log('Registering token with data:', updateData);
-        
-        // Find if token exists and update it, or create new
-        const tokenDoc = await NotificationToken.findOneAndUpdate(
-            { expoPushToken },
-            updateData,
-            { upsert: true, new: true }
-        );
-        
-        res.status(200).json({
-            success: true,
-            message: 'Push token registered successfully',
-            token: tokenDoc
-        });
-    } catch (error) {
+    
+        res.status(200).json({ success: true, message: 'Push token registered' });
+      } catch (error) {
         console.error('Error registering push token:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to register push token',
-            error: error.message
-        });
-    }
+        res.status(500).json({ success: false, message: 'Failed to register token' });
+      }
 };
 
 exports.sendTestNotification = async (req, res) => {

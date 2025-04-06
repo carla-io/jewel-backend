@@ -9,8 +9,6 @@ const cloudinary = require('../config/cloudinary');
 // const passport = require("passport");
 
 
-
-
 const register = async (req, res) => {
     try {
         console.log("Received file:", req.file); // Debugging
