@@ -181,11 +181,24 @@ exports.deleteOrder = async (req, res) => {
 
 exports.getMonthlySales = async (req, res) => {
     try {
+        // Get date range parameters or use defaults
+        const { startDate, endDate } = req.query;
+        
+        // Build match criteria
+        const matchCriteria = { 
+            orderStatus: 'Delivered' // Changed from 'Completed' to match your order status
+        };
+        
+        // Add date range filter if provided
+        if (startDate || endDate) {
+            matchCriteria.createdAt = {};
+            if (startDate) matchCriteria.createdAt.$gte = new Date(startDate);
+            if (endDate) matchCriteria.createdAt.$lte = new Date(endDate);
+        }
+        
         const salesData = await Order.aggregate([
             {
-                $match: {
-                    status: 'Completed',
-                }
+                $match: matchCriteria
             },
             {
                 $group: {
@@ -193,22 +206,65 @@ exports.getMonthlySales = async (req, res) => {
                         year: { $year: "$createdAt" },
                         month: { $month: "$createdAt" }
                     },
-                    totalSales: { $sum: "$totalPrice" }
+                    totalSales: { $sum: "$totalPrice" },
+                    orderCount: { $sum: 1 },
+                    avgOrderValue: { $avg: "$totalPrice" }
                 }
             },
             {
                 $sort: { "_id.year": 1, "_id.month": 1 }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    year: "$_id.year",
+                    month: "$_id.month",
+                    monthName: {
+                        $let: {
+                            vars: {
+                                monthsInString: [
+                                    "", "January", "February", "March", "April", "May", "June",
+                                    "July", "August", "September", "October", "November", "December"
+                                ]
+                            },
+                            in: { $arrayElemAt: ["$$monthsInString", "$_id.month"] }
+                        }
+                    },
+                    totalSales: { $round: ["$totalSales", 2] },
+                    orderCount: 1,
+                    avgOrderValue: { $round: ["$avgOrderValue", 2] }
+                }
             }
         ]);
 
         if (!salesData || salesData.length === 0) {
-            return res.status(404).json({ message: 'No sales data found.' });
+            return res.status(404).json({ 
+                success: false,
+                message: 'No sales data found for the specified criteria.' 
+            });
         }
 
-        res.status(200).json({ salesData });
+        // Calculate summary statistics
+        const summary = {
+            totalPeriodSales: salesData.reduce((sum, month) => sum + month.totalSales, 0).toFixed(2),
+            totalOrders: salesData.reduce((sum, month) => sum + month.orderCount, 0),
+            averageMonthlyRevenue: (salesData.reduce((sum, month) => sum + month.totalSales, 0) / salesData.length).toFixed(2),
+            bestMonth: salesData.reduce((best, current) => 
+                (current.totalSales > best.totalSales) ? current : best, salesData[0])
+        };
+
+        res.status(200).json({ 
+            success: true,
+            salesData,
+            summary
+        });
     } catch (error) {
         console.error('Error fetching monthly sales data:', error);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ 
+            success: false,
+            message: 'Server Error', 
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+        });
     }
 };
 
